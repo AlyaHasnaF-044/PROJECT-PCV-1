@@ -202,15 +202,44 @@ def draw_finished_food(recipe):
     draw_text(screen, "+300 BONUS!  •  LANJUT KE PESANAN BERIKUTNYA", SMALL, (153, 245, 154), (640, 510))
 
 
-def draw_avatar():
-    # Simple friendly cook avatar, replace with PNG if desired.
-    pygame.draw.ellipse(screen, (210, 73, 55), (17, 612, 64, 56))
-    pygame.draw.circle(screen, (240, 194, 153), (47, 611), 34)
-    pygame.draw.arc(screen, (76, 42, 26), (13, 575, 69, 68), math.pi, 2*math.pi, 12)
-    pygame.draw.circle(screen, (59, 34, 22), (78, 601), 12)
-    pygame.draw.circle(screen, (55, 34, 25), (37, 611), 3)
-    pygame.draw.circle(screen, (55, 34, 25), (57, 611), 3)
-    pygame.draw.arc(screen, (133, 52, 40), (37, 616, 20, 15), 0, math.pi, 3)
+def draw_avatar(mood="neutral", t=0.0):
+    """Draw Mama with a clearly changing happy/angry/neutral expression."""
+    # Tiny movement makes the reaction easier to notice.
+    bounce = int(3 * math.sin(t * 8)) if mood == "happy" else 0
+    shake = int(3 * math.sin(t * 28)) if mood == "angry" else 0
+    x, y = 49 + shake, 610 - bounce
+
+    # Body and face
+    pygame.draw.ellipse(screen, (210, 73, 55), (x-31, y+18, 64, 48))
+    pygame.draw.circle(screen, (240, 194, 153), (x, y), 34)
+    # Chef hat
+    pygame.draw.ellipse(screen, (255, 247, 226), (x-30, y-39, 60, 22))
+    pygame.draw.circle(screen, (255, 247, 226), (x-18, y-43), 14)
+    pygame.draw.circle(screen, (255, 247, 226), (x, y-49), 17)
+    pygame.draw.circle(screen, (255, 247, 226), (x+18, y-43), 14)
+    pygame.draw.line(screen, (208, 188, 158), (x-29, y-30), (x+29, y-30), 3)
+
+    eye_color = (55, 34, 25)
+    if mood == "angry":
+        # Angled brows, narrowed eyes, and frown.
+        pygame.draw.line(screen, eye_color, (x-22, y-15), (x-7, y-9), 4)
+        pygame.draw.line(screen, eye_color, (x+7, y-9), (x+22, y-15), 4)
+        pygame.draw.line(screen, eye_color, (x-17, y-3), (x-8, y-3), 4)
+        pygame.draw.line(screen, eye_color, (x+8, y-3), (x+17, y-3), 4)
+        pygame.draw.arc(screen, (133, 52, 40), (x-13, y+13, 26, 17), math.pi, 2*math.pi, 4)
+        # Small red cheek marks emphasize the wrong-item reaction.
+        pygame.draw.line(screen, (220, 75, 60), (x-29, y+5), (x-22, y+9), 3)
+        pygame.draw.line(screen, (220, 75, 60), (x+22, y+9), (x+29, y+5), 3)
+    elif mood == "happy":
+        pygame.draw.arc(screen, eye_color, (x-23, y-13, 15, 13), 0.1, math.pi-0.1, 3)
+        pygame.draw.arc(screen, eye_color, (x+8, y-13, 15, 13), 0.1, math.pi-0.1, 3)
+        pygame.draw.arc(screen, (160, 48, 37), (x-14, y+1, 28, 22), 0, math.pi, 4)
+        pygame.draw.circle(screen, (245, 126, 117), (x-24, y+8), 5)
+        pygame.draw.circle(screen, (245, 126, 117), (x+24, y+8), 5)
+    else:
+        pygame.draw.circle(screen, eye_color, (x-14, y-7), 3)
+        pygame.draw.circle(screen, eye_color, (x+14, y-7), 3)
+        pygame.draw.line(screen, (133, 52, 40), (x-9, y+12), (x+9, y+12), 3)
 
 def draw_camera_preview(frame, tracked):
     x, y, w, h = WIDTH-140, HEIGHT-106, 126, 92
@@ -289,10 +318,16 @@ def main():
     order_completed_until = 0.0
     added = []
     wrong_feedback_until = 0
+    avatar_mood = "neutral"
+    avatar_mood_until = 0.0
+    drop_history = []  # (ingredient_id, was_correct), so KEMBALIKAN can undo wrong drops too
     message = "Ambil bahan bergaris hijau"
     message_until = 0
     selected_ingredient = None
     held_ingredient = None
+    # Ingredients are physical items: once dropped into the pan, they disappear.
+    available_ingredients = [item["id"] for item in INGREDIENTS]
+    random.shuffle(available_ingredients)
     last_stir_angle = None
     stir_total = 0.0
     stirred = False
@@ -304,7 +339,63 @@ def main():
         (58, 180), (350, 180), (492, 180), (680, 180),
         (866, 180), (974, 180), (1118, 180)
     ]
-    ingredient_order = ["egg", "onion", "rice", "tomato", "carrot", "chili", "mushroom"]
+    ingredient_order = available_ingredients[:]
+
+    def randomize_ingredient_positions():
+        """Shuffle remaining ingredients and assign them to the counter slots."""
+        nonlocal ingredient_order
+        ingredient_order = available_ingredients[:]
+        random.shuffle(ingredient_order)
+
+    def consume_ingredient(item_id):
+        """Remove a dropped ingredient, then shuffle the remaining counter items."""
+        nonlocal ingredient_order
+        if item_id in available_ingredients:
+            available_ingredients.remove(item_id)
+        randomize_ingredient_positions()
+
+    def drop_item(item_id, now):
+        """Apply score/reaction and remember the last item for the return button."""
+        nonlocal score, message, message_until, wrong_feedback_until, avatar_mood, avatar_mood_until
+        correct = item_id in current_recipe["items"] and item_id not in added
+        drop_history.append((item_id, correct))
+        if correct:
+            added.append(item_id)
+            score += 100
+            message = "Benar! Mama senang! +100 poin"
+            avatar_mood = "happy"
+        else:
+            score -= 50
+            wrong_feedback_until = now + 0.7
+            message = "Salah bahan! Mama marah! -50 poin"
+            avatar_mood = "angry"
+        message_until = now + 1.4
+        avatar_mood_until = now + 1.6
+        consume_ingredient(item_id)
+
+    def return_last_item():
+        """Undo the most recent drop, whether it was right or wrong."""
+        nonlocal score, message, message_until, avatar_mood, avatar_mood_until, selected_ingredient
+        if not drop_history:
+            message = "Belum ada bahan yang bisa dikembalikan"
+            message_until = time.time() + 1.2
+            return
+        item_id, was_correct = drop_history.pop()
+        if was_correct:
+            if item_id in added:
+                added.remove(item_id)
+            score -= 100
+            message = "Bahan benar dikembalikan: -100 poin"
+        else:
+            score += 50  # reverse the -50 penalty for the wrong ingredient
+            message = "Bahan salah dikembalikan: +50 poin"
+        if item_id not in available_ingredients:
+            available_ingredients.append(item_id)
+        randomize_ingredient_positions()
+        selected_ingredient = None
+        avatar_mood = "neutral"
+        avatar_mood_until = time.time() + 0.5
+        message_until = time.time() + 1.4
 
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -321,7 +412,11 @@ def main():
             order_index += 1
             current_recipe = random.choice(RECIPES)
             added = []
+            drop_history.clear()
             selected_ingredient = None
+            available_ingredients = [item["id"] for item in INGREDIENTS]
+            random.shuffle(available_ingredients)
+            randomize_ingredient_positions()
             last_stir_angle = None
             stir_total = 0.0
             stirred = False
@@ -370,6 +465,8 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.key == pygame.K_BACKSPACE and started and not game_over:
+                    return_last_item()
                 elif event.key == pygame.K_SPACE and not started:
                     started = True
                 elif event.key == pygame.K_r:
@@ -380,7 +477,11 @@ def main():
                     current_recipe = random.choice(RECIPES)
                     order_completed_until = 0.0
                     added, held_ingredient = [], None
+                    drop_history.clear()
                     selected_ingredient = None
+                    available_ingredients = [item["id"] for item in INGREDIENTS]
+                    random.shuffle(available_ingredients)
+                    randomize_ingredient_positions()
                     stir_total, stirred = 0.0, False
                 elif event.key == pygame.K_RETURN and game_over:
                     started, game_over = True, False
@@ -389,7 +490,11 @@ def main():
                     current_recipe = random.choice(RECIPES)
                     order_completed_until = 0.0
                     added, held_ingredient = [], None
+                    drop_history.clear()
                     selected_ingredient = None
+                    available_ingredients = [item["id"] for item in INGREDIENTS]
+                    random.shuffle(available_ingredients)
+                    randomize_ingredient_positions()
                     stir_total, stirred = 0.0, False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mx, my = event.pos
@@ -401,26 +506,25 @@ def main():
                         started, game_over = True, False
                         score, remaining, order_index = 0, 60.0, 0
                         added, held_ingredient = [], None
+                        drop_history.clear()
+                        selected_ingredient = None
+                        available_ingredients = [item["id"] for item in INGREDIENTS]
+                        random.shuffle(available_ingredients)
+                        randomize_ingredient_positions()
                         stir_total, stirred = 0.0, False
                 else:
                     # Mouse fallback is useful if webcam/glove is not available.
                     cursor = [mx, my]
                     for i, (px, py) in enumerate(positions):
-                        if math.dist((mx, my), (px, py)) < 38 and selected_ingredient is None:
+                        if i < len(ingredient_order) and math.dist((mx, my), (px, py)) < 38 and selected_ingredient is None:
                             selected_ingredient = ingredient_order[i]
                             break
                     if selected_ingredient and 530 <= mx <= 750 and 390 <= my <= 565:
-                        if selected_ingredient == current_recipe["items"][len(added)] if len(added) < len(current_recipe["items"]) else False:
-                            added.append(selected_ingredient)
-                            score += 100
-                            selected_ingredient = None
-                        else:
-                            wrong_feedback_until = now + 0.7
-                            selected_ingredient = None
+                        item = selected_ingredient
+                        drop_item(item, now)
+                        selected_ingredient = None
                     if 550 <= mx <= 730 and 310 <= my <= 355:
-                        if added:
-                            added.pop()
-                            score = max(0, score-100)
+                        return_last_item()
 
         # Game interaction from detected glove cursor.
         if started and not game_over and order_completed_until <= now and tracked:
@@ -428,30 +532,19 @@ def main():
             # Pick ingredient when cursor stays in its area. Simple edge-trigger cooldown.
             if selected_ingredient is None:
                 for i, (px, py) in enumerate(positions):
-                    if math.dist((cx, cy), (px, py)) < 33:
-                        candidate = ingredient_order[i]
-                        # Only pick when the current required ingredient is targeted.
-                        if len(added) < len(current_recipe["items"]) and candidate == current_recipe["items"][len(added)]:
-                            selected_ingredient = candidate
-                            message = "Bawa ke wajan"
-                            message_until = now + 1.2
-                            break
-                        elif len(added) < len(current_recipe["items"]):
-                            wrong_feedback_until = now + 0.25
+                    if i < len(ingredient_order) and math.dist((cx, cy), (px, py)) < 33:
+                        selected_ingredient = ingredient_order[i]
+                        message = "Bawa bahan ke wajan"
+                        message_until = now + 1.0
+                        break
             if selected_ingredient:
-                # When cursor reaches pan, drop ingredient into the pan.
+                # Drop any picked item into the pan. Wrong ingredients are consumed too.
                 if 525 <= cx <= 755 and 390 <= cy <= 560:
-                    if len(added) < len(current_recipe["items"]) and selected_ingredient == current_recipe["items"][len(added)]:
-                        added.append(selected_ingredient)
-                        score += 100
-                        selected_ingredient = None
-                        message = "Bagus! Ambil bahan berikutnya"
-                        message_until = now + 1.2
-                    else:
-                        selected_ingredient = None
-                        wrong_feedback_until = now + 0.7
+                    item = selected_ingredient
+                    drop_item(item, now)
+                    selected_ingredient = None
             # Stir: trace a circular path over the pan after all ingredients are added.
-            if len(added) == len(current_recipe["items"]) and not stirred:
+            if all(item in added for item in current_recipe["items"]) and not stirred:
                 dx, dy = cx-640, cy-475
                 radius = math.hypot(dx, dy)
                 if 48 < radius < 145:
@@ -476,8 +569,8 @@ def main():
             pygame.draw.rect(screen, (76, 130, 64), (555, 105, 170, 38), 2, border_radius=19)
             draw_text(screen, message, FONT, (197, 235, 194), (640, 124))
         else:
-            prompt = (f"Resep: {current_recipe['name']} — ambil bahan hijau"
-                      if len(added) < len(current_recipe["items"])
+            prompt = (f"Resep: {current_recipe['name']} — ambil bahan yang dibutuhkan"
+                      if not all(item in added for item in current_recipe["items"])
                       else ("Putar tangan di atas wajan" if not stirred else "Masakan selesai!"))
             rounded(screen, (29, 48, 29), (500, 105, 280, 38), 19)
             pygame.draw.rect(screen, (76, 130, 64), (500, 105, 280, 38), 2, border_radius=19)
@@ -485,22 +578,21 @@ def main():
 
         # Ingredients across the wall
         for i, iid in enumerate(ingredient_order):
+            if i >= len(positions):
+                break
             ing = next(a for a in INGREDIENTS if a["id"] == iid)
-            selected = (len(added) < len(current_recipe["items"]) and iid == current_recipe["items"][len(added)] and started and not game_over and order_completed_until <= now)
+            # Outline every still-needed recipe ingredient; wrong ingredients remain pickable.
+            selected = (iid in current_recipe["items"] and iid not in added and started and not game_over and order_completed_until <= now)
             wrong = now < wrong_feedback_until and iid not in current_recipe["items"]
             draw_ingredient_icon(ing, positions[i], 28, selected, wrong)
 
         # Return button
         button_rect = (560, 315, 160, 38)
-        enabled = len(added) > 0
+        enabled = len(drop_history) > 0
         draw_button("↶  KEMBALIKAN", button_rect, (35, 43, 48) if enabled else (57, 47, 39), BLUE if enabled else (111, 100, 88))
         # Return button interaction with mouse, plus green glove cursor.
-        if started and tracked and enabled:
-            cx, cy = cursor
-            if 550 <= cx <= 730 and 310 <= cy <= 360 and pygame.mouse.get_pressed()[0]:
-                added.pop()
-                score = max(0, score-100)
-                selected_ingredient = None
+        # KEMBALIKAN is activated by clicking it (or pressing Backspace).
+        # It undoes the most recent dropped item, including an incorrect one.
 
         # Ingredient being carried follows the detected glove cursor.
         if selected_ingredient and started and not game_over:
@@ -509,7 +601,7 @@ def main():
                 draw_ingredient_icon(held, cursor, 22, selected=False, wrong=False)
 
         draw_pan(added)
-        draw_avatar()
+        draw_avatar(avatar_mood if now < avatar_mood_until else "neutral", now)
         draw_camera_preview(camera_frame, tracked)
 
         # Green cursor overlay; position maps to the full game canvas.
