@@ -11,8 +11,7 @@ WIDTH, HEIGHT = 1280, 720
 FPS = 60
 CAM_W, CAM_H = 320, 240
 
-# HSV range for a bright green glove. Tune these values for your
-# lighting/glove using the live camera preview.
+
 GREEN_LOWER = np.array([35, 65, 45], dtype=np.uint8)
 GREEN_UPPER = np.array([95, 255, 255], dtype=np.uint8)
 
@@ -28,7 +27,7 @@ ORANGE = (255, 145, 48)
 RED = (255, 76, 59)
 BLUE = (117, 202, 231)
 
-# Ingredients in the recipe. Replace icon labels with image assets later.
+
 INGREDIENTS = [
     {"id": "egg", "name": "Telur", "icon": "🥚", "color": (255, 218, 112)},
     {"id": "onion", "name": "Bawang", "icon": "🧅", "color": (197, 164, 116)},
@@ -69,7 +68,7 @@ def rounded(surface, color, rect, radius=12, width=0):
 
 def draw_background():
     screen.fill(BG)
-    # Warm kitchen wall gradient-like horizontal bands
+    
     for y in range(0, 526, 4):
         t = y / 526
         col = (int(71 - 29*t), int(39 - 20*t), int(24 - 11*t))
@@ -222,13 +221,13 @@ def draw_avatar(mood="neutral", t=0.0):
         pygame.draw.circle(screen, (245, 126, 117), (x-24, y+8), 5)
         pygame.draw.circle(screen, (245, 126, 117), (x+24, y+8), 5)
     elif mood == "happy":
-         # Angled brows, narrowed eyes, and frown.
+        
         pygame.draw.line(screen, eye_color, (x-22, y-15), (x-7, y-9), 4)
         pygame.draw.line(screen, eye_color, (x+7, y-9), (x+22, y-15), 4)
         pygame.draw.line(screen, eye_color, (x-17, y-3), (x-8, y-3), 4)
         pygame.draw.line(screen, eye_color, (x+8, y-3), (x+17, y-3), 4)
         pygame.draw.arc(screen, (133, 52, 40), (x-13, y+13, 26, 17), math.pi, 2*math.pi, 4)
-        # Small red cheek marks emphasize the wrong-item reaction.
+       
         pygame.draw.line(screen, (220, 75, 60), (x-29, y+5), (x-22, y+9), 3)
         pygame.draw.line(screen, (220, 75, 60), (x+22, y+9), (x+29, y+5), 3)
     else:
@@ -260,14 +259,14 @@ def draw_button(text, rect, color, text_color=CREAM):
     draw_text(screen, text, FONT, text_color, (rect[0]+rect[2]//2, rect[1]+rect[3]//2))
 
 def draw_intro():
-    # Dim overlay and tutorial card matching the supplied reference.
+    
     shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     shade.fill((0, 0, 0, 185))
     screen.blit(shade, (0, 0))
     card = (410, 42, 460, 636)
     rounded(screen, (42, 22, 15), card, 25)
     pygame.draw.rect(screen, (147, 101, 53), card, 2, border_radius=25)
-    # mini ingredient card illustration
+   
     rounded(screen, (25, 105, 164), (594, 61, 84, 130), 12)
     pygame.draw.rect(screen, (242, 199, 133), (594, 61, 84, 130), 2, border_radius=12)
     mini = [("🥬", 615, 84), ("🥕", 656, 84), ("🌭", 615, 122), ("🐷", 656, 122),
@@ -275,7 +274,7 @@ def draw_intro():
     for emoji, x, y in mini:
         draw_text(screen, emoji, MED, CREAM, (x, y))
     draw_text(screen, "DAPUR MAMA", TITLE, (255, 204, 131), (640, 240))
-    draw_text(screen, "Masak pakai sarung tangan hijau", MED, CREAM, (640, 282))
+    draw_text(screen, "With OPEN CV", MED, CREAM, (640, 282))
     instructions = [
         "1. Nyalakan kamera, hadapkan sarung tangan hijau.",
         "2. Gerakkan tangan → kursor ikut bergerak.",
@@ -315,12 +314,12 @@ def main():
     wrong_feedback_until = 0
     avatar_mood = "neutral"
     avatar_mood_until = 0.0
-    drop_history = []  # (ingredient_id, was_correct), so KEMBALIKAN can undo wrong drops too
+    drop_history = []  
     message = "Ambil bahan bergaris hijau"
     message_until = 0
     selected_ingredient = None
     held_ingredient = None
-    # Ingredients are physical items: once dropped into the pan, they disappear.
+    
     available_ingredients = [item["id"] for item in INGREDIENTS]
     random.shuffle(available_ingredients)
     last_stir_angle = None
@@ -329,7 +328,7 @@ def main():
     last_time = time.time()
     running = True
 
-    # Ingredient row positions. Some are intentionally incorrect decoys.
+   
     positions = [
         (58, 180), (350, 180), (492, 180), (680, 180),
         (866, 180), (974, 180), (1118, 180)
@@ -337,20 +336,20 @@ def main():
     ingredient_order = available_ingredients[:]
 
     def randomize_ingredient_positions():
-        """Shuffle remaining ingredients and assign them to the counter slots."""
+       
         nonlocal ingredient_order
         ingredient_order = available_ingredients[:]
         random.shuffle(ingredient_order)
 
     def consume_ingredient(item_id):
-        """Remove a dropped ingredient, then shuffle the remaining counter items."""
+       
         nonlocal ingredient_order
         if item_id in available_ingredients:
             available_ingredients.remove(item_id)
         randomize_ingredient_positions()
 
     def drop_item(item_id, now):
-        """Apply score/reaction and remember the last item for the return button."""
+        
         nonlocal score, message, message_until, wrong_feedback_until, avatar_mood, avatar_mood_until
         correct = item_id in current_recipe["items"] and item_id not in added
         drop_history.append((item_id, correct))
@@ -369,7 +368,7 @@ def main():
         consume_ingredient(item_id)
 
     def return_last_item():
-        """Undo the most recent drop, whether it was right or wrong."""
+        
         nonlocal score, message, message_until, avatar_mood, avatar_mood_until, selected_ingredient
         if not drop_history:
             message = "Belum ada bahan yang bisa dikembalikan"
@@ -401,7 +400,7 @@ def main():
                 remaining = 0
                 game_over = True
 
-        # A finished plate is shown briefly, then the next order starts automatically.
+        
         if started and order_completed_until and now >= order_completed_until and not game_over:
             order_completed_until = 0.0
             order_index += 1
@@ -418,7 +417,7 @@ def main():
             message = "Pesanan baru! Ambil bahan yang menyala hijau"
             message_until = now + 2.0
 
-        # Read camera and detect green in HSV.
+    
         if cap is not None and cap.isOpened():
             ok, frame = cap.read()
             if ok:
@@ -508,7 +507,7 @@ def main():
                         randomize_ingredient_positions()
                         stir_total, stirred = 0.0, False
                 else:
-                    # Mouse fallback is useful if webcam/glove is not available.
+                    
                     cursor = [mx, my]
                     for i, (px, py) in enumerate(positions):
                         if i < len(ingredient_order) and math.dist((mx, my), (px, py)) < 38 and selected_ingredient is None:
@@ -521,10 +520,10 @@ def main():
                     if 550 <= mx <= 730 and 310 <= my <= 355:
                         return_last_item()
 
-        # Game interaction from detected glove cursor.
+        
         if started and not game_over and order_completed_until <= now and tracked:
             cx, cy = cursor
-            # Pick ingredient when cursor stays in its area. Simple edge-trigger cooldown.
+            
             if selected_ingredient is None:
                 for i, (px, py) in enumerate(positions):
                     if i < len(ingredient_order) and math.dist((cx, cy), (px, py)) < 33:
@@ -533,12 +532,12 @@ def main():
                         message_until = now + 1.0
                         break
             if selected_ingredient:
-                # Drop any picked item into the pan. Wrong ingredients are consumed too.
+                
                 if 525 <= cx <= 755 and 390 <= cy <= 560:
                     item = selected_ingredient
                     drop_item(item, now)
                     selected_ingredient = None
-            # Stir: trace a circular path over the pan after all ingredients are added.
+         
             if all(item in added for item in current_recipe["items"]) and not stirred:
                 dx, dy = cx-640, cy-475
                 radius = math.hypot(dx, dy)
@@ -556,7 +555,7 @@ def main():
                         message = "Masakan selesai!"
                         message_until = order_completed_until
 
-        # Render
+      
         draw_background()
         draw_top_bar(score, remaining, order_index)
         if message_until > now and started and not game_over:
@@ -571,25 +570,23 @@ def main():
             pygame.draw.rect(screen, (76, 130, 64), (500, 105, 280, 38), 2, border_radius=19)
             draw_text(screen, prompt, FONT, (197, 235, 194), (640, 124))
 
-        # Ingredients across the wall
+    
         for i, iid in enumerate(ingredient_order):
             if i >= len(positions):
                 break
             ing = next(a for a in INGREDIENTS if a["id"] == iid)
-            # Outline every still-needed recipe ingredient; wrong ingredients remain pickable.
+            
             selected = (iid in current_recipe["items"] and iid not in added and started and not game_over and order_completed_until <= now)
             wrong = now < wrong_feedback_until and iid not in current_recipe["items"]
             draw_ingredient_icon(ing, positions[i], 28, selected, wrong)
 
-        # Return button
+       
         button_rect = (560, 315, 160, 38)
         enabled = len(drop_history) > 0
         draw_button("↶  KEMBALIKAN", button_rect, (35, 43, 48) if enabled else (57, 47, 39), BLUE if enabled else (111, 100, 88))
-        # Return button interaction with mouse, plus green glove cursor.
-        # KEMBALIKAN is activated by clicking it (or pressing Backspace).
-        # It undoes the most recent dropped item, including an incorrect one.
+      
 
-        # Ingredient being carried follows the detected glove cursor.
+        
         if selected_ingredient and started and not game_over:
             held = next((a for a in INGREDIENTS if a["id"] == selected_ingredient), None)
             if held:
@@ -599,7 +596,7 @@ def main():
         draw_avatar(avatar_mood if now < avatar_mood_until else "neutral", now)
         draw_camera_preview(camera_frame, tracked)
 
-        # Green cursor overlay; position maps to the full game canvas.
+       
         if tracked and started and not game_over:
             cx, cy = cursor
             pygame.draw.circle(screen, (65, 122, 47), (cx, cy), 78, 2)
