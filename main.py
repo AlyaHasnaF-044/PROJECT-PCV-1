@@ -6,11 +6,6 @@ import random
 import sys
 import time
 
-# ============================================================
-# DAPUR MAMA - Cooking game controlled by a green glove
-# Python + Pygame + OpenCV. Assets are optional; UI is drawn
-# directly in code so the game runs before you add artwork.
-# ============================================================
 
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
@@ -221,7 +216,13 @@ def draw_avatar(mood="neutral", t=0.0):
 
     eye_color = (55, 34, 25)
     if mood == "angry":
-        # Angled brows, narrowed eyes, and frown.
+        pygame.draw.arc(screen, eye_color, (x-23, y-13, 15, 13), 0.1, math.pi-0.1, 3)
+        pygame.draw.arc(screen, eye_color, (x+8, y-13, 15, 13), 0.1, math.pi-0.1, 3)
+        pygame.draw.arc(screen, (160, 48, 37), (x-14, y+1, 28, 22), 0, math.pi, 4)
+        pygame.draw.circle(screen, (245, 126, 117), (x-24, y+8), 5)
+        pygame.draw.circle(screen, (245, 126, 117), (x+24, y+8), 5)
+    elif mood == "happy":
+         # Angled brows, narrowed eyes, and frown.
         pygame.draw.line(screen, eye_color, (x-22, y-15), (x-7, y-9), 4)
         pygame.draw.line(screen, eye_color, (x+7, y-9), (x+22, y-15), 4)
         pygame.draw.line(screen, eye_color, (x-17, y-3), (x-8, y-3), 4)
@@ -230,12 +231,6 @@ def draw_avatar(mood="neutral", t=0.0):
         # Small red cheek marks emphasize the wrong-item reaction.
         pygame.draw.line(screen, (220, 75, 60), (x-29, y+5), (x-22, y+9), 3)
         pygame.draw.line(screen, (220, 75, 60), (x+22, y+9), (x+29, y+5), 3)
-    elif mood == "happy":
-        pygame.draw.arc(screen, eye_color, (x-23, y-13, 15, 13), 0.1, math.pi-0.1, 3)
-        pygame.draw.arc(screen, eye_color, (x+8, y-13, 15, 13), 0.1, math.pi-0.1, 3)
-        pygame.draw.arc(screen, (160, 48, 37), (x-14, y+1, 28, 22), 0, math.pi, 4)
-        pygame.draw.circle(screen, (245, 126, 117), (x-24, y+8), 5)
-        pygame.draw.circle(screen, (245, 126, 117), (x+24, y+8), 5)
     else:
         pygame.draw.circle(screen, eye_color, (x-14, y-7), 3)
         pygame.draw.circle(screen, eye_color, (x+14, y-7), 3)
